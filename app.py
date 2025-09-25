@@ -6,7 +6,8 @@ import string
 import numpy as np
 import pdfplumber
 import streamlit as st
-
+import io
+from gtts import gTTS
 # LangChain / FAISS
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -210,24 +211,6 @@ Instructions:
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored
 
-# -------------------------------
-# Onboarding Agent Node
-# -------------------------------
-def generate_password(length=12):
-    chars = string.ascii_letters + string.digits + "!@#$%^&*()"
-    return ''.join(random.choice(chars) for _ in range(length))
-
-def mock_create_account(first_name, last_name, department, personal_email):
-    company_email = f"{first_name.lower()}.{last_name.lower()}@company.com"
-    temp_password = generate_password()
-    return {
-        "company_email": company_email,
-        "temporary_password": temp_password,
-        "status": "Account created",
-        "assigned_department": department,
-        "personal_email": personal_email
-    }
-
 class OnboardingAgent:
     def __init__(self, llm: GeminiLLM, vectorstore, chunks,
                  first_name, last_name, department, personal_email,
@@ -279,6 +262,17 @@ class OnboardingAgent:
         )
         return self.llm.generate(prompt)
 
+    def answer_with_audio(self, user_input: str, lang: str = "en"):
+        """Answer and return (text, audio_bytes) for Streamlit playback."""
+        text_answer = self.answer(user_input)
+
+        # Convert text to speech
+        tts = gTTS(text=text_answer, lang=lang, slow=False)
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+
+        return text_answer, fp.read()
 # -------------------------------
 # Interview Agent Node
 # -------------------------------
@@ -442,6 +436,9 @@ elif mode == "Resume Scoring":
 # -------------------------------
 # Onboarding UI
 # -------------------------------
+# -------------------------------
+# Onboarding UI
+# -------------------------------
 elif mode == "Onboarding":
     st.subheader("Onboarding")
     col1, col2 = st.columns(2)
@@ -451,6 +448,7 @@ elif mode == "Onboarding":
     with col2:
         department = st.text_input("Department")
         personal_email = st.text_input("Personal Email")
+
     if st.button("Generate Welcome + Credentials"):
         if vectorstore is None or len(chunks) == 0:
             st.error("Vector store not loaded.")
@@ -468,7 +466,10 @@ elif mode == "Onboarding":
         if not agent:
             st.error("Create the onboarding agent first.")
         else:
-            st.write(agent.answer(ask_q))
+            text_answer, audio_bytes = agent.answer_with_audio(ask_q)
+            st.write(text_answer)
+            st.audio(audio_bytes, format="audio/mp3", start_time=0)
+
 
 # -------------------------------
 # Interview UI
