@@ -101,7 +101,29 @@ def check_minimum_qualifications(resume_files, job_desc_file_like, gemini_api_ke
     qualified_resumes = []
     for uploaded in resume_files:
         resume_text = extract_text_from_pdf(uploaded)
-        prompt = f"""...same Stage 1 prompt..."""
+        prompt = f"""
+You are an expert HR assistant. Your task is to check if a resume meets the minimum requirements for a given job description.
+
+Minimum Requirements Rules:
+1) If the job description mentions a passing year for a certain level like University, the candidate's passing year must be less than or equal to that year.
+2) If the job description mentions a minimum CGPA, the candidate's CGPA must be greater than or equal to that value.
+3) If the job description mentions minimum years of experience, the candidate's total relevant experience must be greater than or equal to that value.
+
+Instructions:
+- Output ONLY a JSON with the following fields:
+    - "name": Candidate's full name
+    - "email": Candidate's email
+    - "min_score": 10 if all applicable minimum requirements are met, 0 otherwise
+
+Job Description:
+{job_description}
+
+Resume:
+{resume_text}
+Instructions:
+- Output ONLY a JSON with fields: "name", "email", "min_score"
+- "min_score" = 10 if minimum requirements are met, 0 otherwise
+"""
         resp = llm.generate_content(prompt)
         out = resp.candidates[0].content.parts[0].text
         try:
@@ -122,7 +144,24 @@ def score_qualified_resumes(qualified_resumes, job_desc_file_like, gemini_api_ke
     scored = []
     for cand in qualified_resumes:
         resume_text = cand["resume_text"]
-        prompt = f"""...same Stage 2 prompt..."""
+        prompt =f"""
+You are an expert HR assistant. Score the following resume against this job description.
+
+Job Description:
+{job_description}
+
+Resume:
+{resume_text}
+
+Scoring rules:
+- Total score = 100
+   - 10: minimum requirements (already passed)
+   - 20: experience or achievements
+   - 70: relevance to JD
+
+Instructions:
+- Output ONLY a JSON with fields: "name", "email", "score"
+"""
         resp = llm.generate_content(prompt)
         out = resp.candidates[0].content.parts[0].text
         try:
