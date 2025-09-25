@@ -94,15 +94,55 @@ class ConversationalRAGAgent:
 # -------------------------------
 # Resume Scorer Node
 # -------------------------------
+# -------------------------------
+# Resume Scorer Node (Two-Step Stage 1)
+# -------------------------------
 def check_minimum_qualifications(resume_files, job_desc_file_like, gemini_api_key: str):
     genai.configure(api_key=gemini_api_key)
     llm = genai.GenerativeModel("gemini-2.0-flash")
     job_description = extract_text_from_pdf(job_desc_file_like)
     qualified_resumes = []
+
     for uploaded in resume_files:
         resume_text = extract_text_from_pdf(uploaded)
-        prompt = f"""
-You are an expert HR assistant. Your task is to check if a resume meets the minimum requirements for a given job description.
+
+        # -------- Step 1.1: Extract structured info from resume --------
+        extract_prompt = f"""
+You are an expert HR assistant. Extract structured candidate information from this resume.
+
+Resume:
+{resume_text}
+
+Instructions:
+- Output ONLY a JSON with fields:
+  - "name": candidate's full name
+  - "email": candidate's email
+  - "degree": full degree name
+  - "passing_year": year of graduation
+  - "cgpa": candidate CGPA (if available)
+  - "experience": total years of relevant experience
+"""
+        resp_extract = llm.generate_content(extract_prompt)
+        out_extract = resp_extract.candidates[0].content.parts[0].text
+
+        try:
+            m = re.search(r"\{.*\}", out_extract, flags=re.DOTALL)
+            if m:
+                candidate_info = json.loads(m.group(0))
+            else:
+                continue
+        except Exception:
+            continue
+
+        # -------- Step 1.2: Check minimum requirements against JD --------
+        check_prompt = f"""
+You are an expert HR assistant. Decide if the candidate meets the minimum requirements for the job.
+
+Job Description:
+{job_description}
+
+Candidate Info:
+{json.dumps(candidate_info)}
 
 Minimum Requirements Rules:
 1) If the job description mentions a passing year for a certain level like University, the candidate's passing year must be less than or equal to that year.
@@ -110,32 +150,26 @@ Minimum Requirements Rules:
 3) If the job description mentions minimum years of experience, the candidate's total relevant experience must be greater than or equal to that value.
 
 Instructions:
-- Output ONLY a JSON with the following fields:
-    - "name": Candidate's full name
-    - "email": Candidate's email
-    - "min_score": 10 if all applicable minimum requirements are met, 0 otherwise
-
-Job Description:
-{job_description}
-
-Resume:
-{resume_text}
-Instructions:
-- Output ONLY a JSON with fields: "name", "email", "min_score"
-- "min_score" = 10 if minimum requirements are met, 0 otherwise
+- Output ONLY a JSON with fields:
+  - "name": candidate full name
+  - "email": candidate email
+  - "min_score": 10 if all applicable minimum requirements are met, 0 otherwise
 """
-        resp = llm.generate_content(prompt)
-        out = resp.candidates[0].content.parts[0].text
+        resp_check = llm.generate_content(check_prompt)
+        out_check = resp_check.candidates[0].content.parts[0].text
+
         try:
-            m = re.search(r"\{.*\}", out, flags=re.DOTALL)
-            if m:
-                data = json.loads(m.group(0))
+            m2 = re.search(r"\{.*\}", out_check, flags=re.DOTALL)
+            if m2:
+                data = json.loads(m2.group(0))
                 if data.get("min_score", 0) > 0:
                     data["resume_text"] = resume_text
                     qualified_resumes.append(data)
         except Exception:
             continue
+
     return qualified_resumes
+
 
 def score_qualified_resumes(qualified_resumes, job_desc_file_like, gemini_api_key: str):
     genai.configure(api_key=gemini_api_key)
