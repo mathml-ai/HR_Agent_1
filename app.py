@@ -210,7 +210,20 @@ Instructions:
             continue
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored
+def generate_password(length=12):
+    chars = string.ascii_letters + string.digits + "!@#$%^&*()"
+    return ''.join(random.choice(chars) for _ in range(length))
 
+def mock_create_account(first_name, last_name, department, personal_email):
+    company_email = f"{first_name.lower()}.{last_name.lower()}@company.com"
+    temp_password = generate_password()
+    return {
+        "company_email": company_email,
+        "temporary_password": temp_password,
+        "status": "Account created",
+        "assigned_department": department,
+        "personal_email": personal_email
+    }
 class OnboardingAgent:
     def __init__(self, llm: GeminiLLM, vectorstore, chunks,
                  first_name, last_name, department, personal_email,
@@ -231,7 +244,7 @@ class OnboardingAgent:
         policy_texts = [d.page_content for d in all_docs]
         return "\n---\n".join(policy_texts)
 
-    def build_welcome_message(self) -> str:
+    def build_welcome_message(self, lang: str = "en"):
         welcome = f"Welcome aboard, {self.employee_name}! 🎉 We're excited to have you in {self.credentials['assigned_department']}."
         creds = (
             f"Here are your credentials:\n"
@@ -244,7 +257,19 @@ class OnboardingAgent:
             "We value collaboration, integrity, and continuous learning.\n"
         )
         policies = self.retrieve_all_policies()
-        return f"{welcome}\n\n{creds}\n{background}\nHere are the key company policies:\n{policies}\n\nFeel free to ask me any questions!"
+        message = (
+            f"{welcome}\n\n{creds}\n{background}"
+            f"Here are the key company policies:\n{policies}\n\n"
+            f"Feel free to ask me any questions!"
+        )
+    
+        # Convert text to speech
+        tts = gTTS(text=message, lang=lang, slow=False)
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+    
+        return message, fp.read()
 
     def answer(self, user_input: str) -> str:
         if self.retriever_fn:
