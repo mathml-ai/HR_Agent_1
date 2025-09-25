@@ -482,7 +482,12 @@ elif mode == "Onboarding":
                 llm, vectorstore, chunks, first_name, last_name, department, personal_email,
                 retriever_fn=lambda q, k=3, alpha=0.6: hybrid_retrieval_bm25(vectorstore, chunks, q, k=k, alpha=alpha)
             )
-            st.write(onboarding_agent.build_welcome_message())
+
+            # 🔹 now build_welcome_message returns (text, audio)
+            text_msg, audio_bytes = onboarding_agent.build_welcome_message()
+            st.write(text_msg)
+            st.audio(audio_bytes, format="audio/mp3", start_time=0)
+
             st.session_state.onboard_agent = onboarding_agent
 
     ask_q = st.text_input("Ask an onboarding question:")
@@ -494,7 +499,6 @@ elif mode == "Onboarding":
             text_answer, audio_bytes = agent.answer_with_audio(ask_q)
             st.write(text_answer)
             st.audio(audio_bytes, format="audio/mp3", start_time=0)
-
 
 # -------------------------------
 # Interview UI
