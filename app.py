@@ -68,8 +68,9 @@ class ConversationalRAGAgent:
         prompt = (
             "You are a helpful assistant. Use the following context from company policy documents to answer.\n"
             f"Context:\n{context}\n\n"
-            f"Employee asks:\n{question}\n"
-            "Answer based strictly on the context above. If you do not know, say you don't know.\n"
+            "Now the user asks:\n"
+            f"{question}\n"
+            "Answer strictly based on the context above. If you do not know, say you don't know.\n"
         )
         return prompt
 
@@ -370,9 +371,7 @@ else:
     else:
         st.sidebar.info("Provide a valid FAISS directory.")
 
-# Session state for conversation memory
-if "policy_memory" not in st.session_state:
-    st.session_state.policy_memory = ConversationBufferMemory(memory_key="history", return_messages=True)
+
 
 # Mode selection
 mode = st.selectbox("Choose a mode", ["Policy Query", "Resume Scoring", "Onboarding", "Interview"])
