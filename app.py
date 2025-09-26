@@ -386,11 +386,10 @@ if mode == "Policy Query":
         if vectorstore is None or len(chunks) == 0:
             st.error("Vector store not loaded.")
         else:
-            agent = ConversationalRAGAgent(
-                lambda q, k=3, alpha=0.6: hybrid_retrieval_bm25(vectorstore, chunks, q, k=k, alpha=alpha),
-                llm,
-                st.session_state.policy_memory
-            )
+            agent =ConversationalRAGAgent(
+    lambda q, k=3, alpha=0.6: hybrid_retrieval_bm25(vectorstore, chunks, q, k=k, alpha=alpha),
+    llm
+)
             answer, docs = agent.ask(query)
             st.write("Answer:")
             st.write(answer)
