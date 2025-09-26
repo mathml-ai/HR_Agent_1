@@ -10,6 +10,7 @@ import io
 from gtts import gTTS
 # LangChain / FAISS
 from langchain_community.vectorstores import FAISS
+from langchain.schema import HumanMessage, AIMessage
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.memory import ConversationBufferMemory
 from rank_bm25 import BM25Okapi
@@ -67,8 +68,18 @@ class ConversationalRAGAgent:
     def _build_prompt(self, question, retrieved_docs, chat_history_list):
         history_str = ""
         for turn in chat_history_list:
-            role = turn.get("role", "user")
-            content = turn.get("content", "")
+            if isinstance(turn, HumanMessage):
+                role = "user"
+                content = turn.content
+            elif isinstance(turn, AIMessage):
+                role = "assistant"
+                content = turn.content
+            elif isinstance(turn, dict):  # fallback if dict-like
+                role = turn.get("role", "user")
+                content = turn.get("content", "")
+            else:  # generic fallback
+                role = "user"
+                content = str(turn)
             history_str += f"{role}: {content}\n"
         context = "\n---\n".join(retrieved_docs)
         prompt = (
