@@ -10,7 +10,7 @@ import io
 from gtts import gTTS
 # LangChain / FAISS
 from langchain_community.vectorstores import FAISS
-from langchain.schema import HumanMessage, AIMessage
+
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.memory import ConversationBufferMemory
 from rank_bm25 import BM25Okapi
@@ -57,38 +57,18 @@ def extract_text_from_pdf(file_like) -> str:
 # Conversational RAG Agent
 # -------------------------------
 class ConversationalRAGAgent:
-    def __init__(self, retriever_fn, llm: GeminiLLM, memory: ConversationBufferMemory,
-                 alpha: float = 0.6, top_k: int = 3):
+    def __init__(self, retriever_fn, llm: GeminiLLM, alpha: float = 0.6, top_k: int = 3):
         self.retriever_fn = retriever_fn
         self.llm = llm
-        self.memory = memory
         self.alpha = alpha
         self.top_k = top_k
 
-    def _build_prompt(self, question, retrieved_docs, chat_history_list):
-        history_str = ""
-        for turn in chat_history_list:
-            if isinstance(turn, HumanMessage):
-                role = "user"
-                content = turn.content
-            elif isinstance(turn, AIMessage):
-                role = "assistant"
-                content = turn.content
-            elif isinstance(turn, dict):  # fallback if dict-like
-                role = turn.get("role", "user")
-                content = turn.get("content", "")
-            else:  # generic fallback
-                role = "user"
-                content = str(turn)
-            history_str += f"{role}: {content}\n"
+    def _build_prompt(self, question, retrieved_docs):
         context = "\n---\n".join(retrieved_docs)
         prompt = (
             "You are a helpful assistant. Use the following context from company policy documents to answer.\n"
             f"Context:\n{context}\n\n"
-            "Chat History:\n"
-            f"{history_str}\n"
-            "Now the user asks:\n"
-            f"{question}\n"
+            f"Employee asks:\n{question}\n"
             "Answer based strictly on the context above. If you do not know, say you don't know.\n"
         )
         return prompt
@@ -96,11 +76,8 @@ class ConversationalRAGAgent:
     def ask(self, query):
         retrieved = self.retriever_fn(query, k=self.top_k, alpha=self.alpha)
         retrieved_docs = [doc for doc, _ in retrieved]
-        chat_hist = self.memory.load_memory_variables({}).get("history", [])
-        chat_history = chat_hist if isinstance(chat_hist, list) else []
-        prompt = self._build_prompt(query, retrieved_docs, chat_history)
+        prompt = self._build_prompt(query, retrieved_docs)
         response = self.llm.generate(prompt)
-        self.memory.save_context({"input": query}, {"output": response})
         return response, retrieved_docs
 
 # -------------------------------
