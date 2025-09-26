@@ -354,7 +354,7 @@ with st.sidebar:
 llm = GeminiLLM()
 
 # Load or build vectorstore
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2",model_kwargs={"device": "cpu"})
 vectorstore = None
 chunks = []
 
